@@ -1,5 +1,6 @@
 package com.holydev.lab.multithreadediolab.app;
 
+import com.holydev.lab.multithreadediolab.domain.job.CancelJobResponse;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.JobFailureSummary;
@@ -57,6 +58,14 @@ public class DownloadJobService {
 
     public JobFailureSummary getFailureSummary(long jobId) {
         return tracker.getFailureSummary(jobId);
+    }
+
+    public CancelJobResponse cancelJob(long jobId) {
+        CancelJobResponse response = tracker.cancelJob(jobId);
+        if (response == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "job not found");
+        }
+        return response;
     }
 
     private void validateBaseUrl(String baseUrl) {

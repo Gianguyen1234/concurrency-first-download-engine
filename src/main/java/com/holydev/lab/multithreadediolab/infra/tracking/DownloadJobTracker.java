@@ -2,6 +2,7 @@ package com.holydev.lab.multithreadediolab.infra.tracking;
 
 import com.holydev.lab.multithreadediolab.domain.download.DownloadResult;
 import com.holydev.lab.multithreadediolab.domain.download.FailureType;
+import com.holydev.lab.multithreadediolab.domain.job.CancelJobResponse;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.JobFailureSummary;
@@ -39,11 +40,12 @@ public class DownloadJobTracker {
         }
     }
 
-    public void markTaskRunning(long jobId, int index, String threadName) {
+    public boolean markTaskRunning(long jobId, int index, String threadName) {
         JobRuntimeState state = jobs.get(jobId);
         if (state != null) {
-            state.markTaskRunning(index, threadName);
+            return state.markTaskRunning(index, threadName);
         }
+        return false;
     }
 
     public void markTaskRetry(long jobId, int index, int retryCount, String threadName, FailureType failureType, String error) {
@@ -75,6 +77,16 @@ public class DownloadJobTracker {
         return state == null ? null : state.failureSummary();
     }
 
+    public CancelJobResponse cancelJob(long jobId) {
+        JobRuntimeState state = jobs.get(jobId);
+        return state == null ? null : state.cancel();
+    }
+
+    public boolean isJobCancelled(long jobId) {
+        JobRuntimeState state = jobs.get(jobId);
+        return state != null && state.isCancelled();
+    }
+
     // State nội bộ của 1 job. Dùng synchronized vì nhiều worker thread có thể update cùng lúc.
     private static final class JobRuntimeState {
         private final long jobId;
@@ -88,9 +100,11 @@ public class DownloadJobTracker {
         private int completed;
         private int okCount;
         private int failCount;
+        private int cancelledCount;
         private long totalBytes;
         private long totalTaskMillis;
         private long finishedAtNs;
+        private boolean cancelled;
 
         private JobRuntimeState(long jobId, String sourceBaseUrl, int totalRequested) {
             this.jobId = jobId;
@@ -106,16 +120,27 @@ public class DownloadJobTracker {
         }
 
         // Worker lấy được task thì task chuyển từ QUEUED sang RUNNING.
-        private synchronized void markTaskRunning(int index, String threadName) {
+        private synchronized boolean markTaskRunning(int index, String threadName) {
             TaskRuntimeState task = tasks.get(index);
             if (task == null || task.status != TaskStatus.QUEUED) {
-                return;
+                return false;
+            }
+
+            if (cancelled) {
+                task.status = TaskStatus.CANCELLED;
+                task.error = "Job was cancelled before the task started";
+                queued--;
+                completed++;
+                cancelledCount++;
+                finishIfDone();
+                return false;
             }
 
             task.status = TaskStatus.RUNNING;
             task.threadName = threadName;
             queued--;
             running++;
+            return true;
         }
 
         // Khi task fail nhưng vẫn còn quyền retry, ta cập nhật số lần retry gần nhất để client nhìn thấy tiến trình.
@@ -140,6 +165,8 @@ public class DownloadJobTracker {
 
             if (task.status == TaskStatus.RUNNING) {
                 running--;
+            } else if (task.status == TaskStatus.CANCELLED) {
+                return;
             } else if (task.status == TaskStatus.QUEUED) {
                 queued--;
             }
@@ -163,9 +190,7 @@ public class DownloadJobTracker {
                 failCount++;
             }
 
-            if (finishedAtNs == 0 && totalRequested > 0 && completed >= totalRequested) {
-                finishedAtNs = System.nanoTime();
-            }
+            finishIfDone();
         }
 
         // Snapshot này là thứ controller trả ra cho client.
@@ -187,11 +212,13 @@ public class DownloadJobTracker {
                     completed,
                     okCount,
                     failCount,
+                    cancelledCount,
                     totalBytes,
                     totalWallMillis,
                     avgTaskMillis,
                     throughputImagesPerSecond,
                     throughputMegabytesPerSecond,
+                    cancelled,
                     finished
             );
         }
@@ -239,6 +266,39 @@ public class DownloadJobTracker {
                     successfulAfterRetry,
                     failureCountsView
             );
+        }
+
+        private synchronized CancelJobResponse cancel() {
+            if (!cancelled) {
+                cancelled = true;
+                for (TaskRuntimeState task : tasks.values()) {
+                    if (task.status == TaskStatus.QUEUED) {
+                        task.status = TaskStatus.CANCELLED;
+                        task.error = "Job was cancelled before the task started";
+                        queued--;
+                        completed++;
+                        cancelledCount++;
+                    }
+                }
+                finishIfDone();
+            }
+
+            return new CancelJobResponse(
+                    jobId,
+                    true,
+                    cancelledCount,
+                    "Job cancelled. Running tasks may finish their current attempt, but queued tasks and future retries are stopped."
+            );
+        }
+
+        private synchronized boolean isCancelled() {
+            return cancelled;
+        }
+
+        private void finishIfDone() {
+            if (finishedAtNs == 0 && totalRequested > 0 && completed >= totalRequested) {
+                finishedAtNs = System.nanoTime();
+            }
         }
     }
 

@@ -57,7 +57,20 @@ public class ImageDownloaderService {
         long taskStartNs = System.nanoTime();
 
         // Vua vao worker thi danh dau task tu QUEUED -> RUNNING.
-        tracker.markTaskRunning(jobId, index, threadName);
+        boolean started = tracker.markTaskRunning(jobId, index, threadName);
+        if (!started) {
+            DownloadResult cancelledResult = new DownloadResult(
+                    index,
+                    false,
+                    0,
+                    0,
+                    null,
+                    "Job was cancelled before the task started",
+                    FailureType.UNKNOWN,
+                    0
+            );
+            return CompletableFuture.completedFuture(cancelledResult);
+        }
 
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             try {
@@ -68,6 +81,21 @@ public class ImageDownloaderService {
                 FailureType failureType = classifyFailure(e);
                 long millis = (System.nanoTime() - taskStartNs) / 1_000_000;
                 String err = e.getClass().getSimpleName() + ": " + e.getMessage();
+
+                if (tracker.isJobCancelled(jobId)) {
+                    DownloadResult cancelledResult = new DownloadResult(
+                            index,
+                            false,
+                            0,
+                            millis,
+                            null,
+                            "Job was cancelled while the task was running",
+                            failureType,
+                            attempt
+                    );
+                    tracker.recordResult(jobId, cancelledResult, threadName);
+                    return CompletableFuture.completedFuture(cancelledResult);
+                }
 
                 if (shouldRetry(failureType) && attempt < maxRetries) {
                     int nextRetryCount = attempt + 1;

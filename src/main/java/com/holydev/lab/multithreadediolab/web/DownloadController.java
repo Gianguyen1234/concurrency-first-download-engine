@@ -1,12 +1,14 @@
 package com.holydev.lab.multithreadediolab.web;
 
 import com.holydev.lab.multithreadediolab.app.DownloadJobService;
+import com.holydev.lab.multithreadediolab.domain.job.CancelJobResponse;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.JobFailureSummary;
 import com.holydev.lab.multithreadediolab.domain.job.StartJobResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -43,5 +45,11 @@ public class DownloadController {
     @GetMapping("/jobs/{jobId}/failure-summary")
     public JobFailureSummary jobFailureSummary(@PathVariable long jobId) {
         return jobService.getFailureSummary(jobId);
+    }
+
+    // Huy job: task dang queue se bi dung, task dang chay duoc phep ket thuc attempt hien tai.
+    @PostMapping("/jobs/{jobId}/cancel")
+    public CancelJobResponse cancelJob(@PathVariable long jobId) {
+        return jobService.cancelJob(jobId);
     }
 }

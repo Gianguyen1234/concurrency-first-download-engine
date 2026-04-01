@@ -25,6 +25,9 @@ public record DownloadJobSnapshot(
         // Trong số task đã kết thúc, có bao nhiêu task thất bại.
         int failCount,
 
+        // Trong số task của job, có bao nhiêu task đã bị hủy trước khi chạy xong.
+        int cancelledCount,
+
         // Tổng số byte tải thành công được tính đến thời điểm hiện tại.
         long totalBytes,
 
@@ -39,6 +42,9 @@ public record DownloadJobSnapshot(
 
         // Throughput theo MB dữ liệu tải thành công trên mỗi giây.
         double throughputMegabytesPerSecond,
+
+        // Job đã bị yêu cầu hủy hay chưa.
+        boolean cancelled,
 
         // Job đã hoàn tất toàn bộ task hay chưa.
         boolean finished
