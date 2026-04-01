@@ -1,6 +1,7 @@
 package com.holydev.lab.multithreadediolab.infra.tracking;
 
 import com.holydev.lab.multithreadediolab.domain.download.DownloadResult;
+import com.holydev.lab.multithreadediolab.domain.download.FailureType;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.TaskStatus;
@@ -40,6 +41,13 @@ public class DownloadJobTracker {
         JobRuntimeState state = jobs.get(jobId);
         if (state != null) {
             state.markTaskRunning(index, threadName);
+        }
+    }
+
+    public void markTaskRetry(long jobId, int index, int retryCount, String threadName, FailureType failureType, String error) {
+        JobRuntimeState state = jobs.get(jobId);
+        if (state != null) {
+            state.markTaskRetry(index, retryCount, threadName, failureType, error);
         }
     }
 
@@ -103,6 +111,19 @@ public class DownloadJobTracker {
             running++;
         }
 
+        // Khi task fail nhưng vẫn còn quyền retry, ta cập nhật số lần retry gần nhất để client nhìn thấy tiến trình.
+        private synchronized void markTaskRetry(int index, int retryCount, String threadName, FailureType failureType, String error) {
+            TaskRuntimeState task = tasks.get(index);
+            if (task == null) {
+                return;
+            }
+
+            task.retryCount = retryCount;
+            task.threadName = threadName;
+            task.failureType = failureType;
+            task.error = error;
+        }
+
         // Mọi đường đi cuối cùng đều đổ về đây: success hay fail đều tính là task đã hoàn tất.
         private synchronized void recordResult(DownloadResult result, String threadName) {
             TaskRuntimeState task = tasks.get(result.index());
@@ -122,6 +143,7 @@ public class DownloadJobTracker {
             task.status = result.ok() ? TaskStatus.SUCCESS : TaskStatus.FAILED;
             task.bytes = result.bytes();
             task.millis = result.millis();
+            task.retryCount = result.retryCount();
             task.contentType = result.contentType();
             task.error = result.error();
             task.failureType = result.failureType();
@@ -184,9 +206,10 @@ public class DownloadJobTracker {
         private TaskStatus status = TaskStatus.QUEUED;
         private long bytes;
         private long millis;
+        private int retryCount;
         private String contentType;
         private String error;
-        private com.holydev.lab.multithreadediolab.domain.download.FailureType failureType;
+        private FailureType failureType;
         private String threadName;
 
         private TaskRuntimeState(int index, String url) {
@@ -195,7 +218,7 @@ public class DownloadJobTracker {
         }
 
         private DownloadTaskSnapshot snapshot() {
-            return new DownloadTaskSnapshot(index, url, status, bytes, millis, contentType, error, failureType, threadName);
+            return new DownloadTaskSnapshot(index, url, status, bytes, millis, retryCount, contentType, error, failureType, threadName);
         }
     }
 }

@@ -7,6 +7,7 @@ public record DownloadResult(
         long millis,
         String contentType,
         String error,
-        FailureType failureType
+        FailureType failureType,
+        int retryCount
 ) {
 }

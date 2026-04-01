@@ -8,6 +8,7 @@ public record DownloadTaskSnapshot(
         TaskStatus status,
         long bytes,
         long millis,
+        int retryCount,
         String contentType,
         String error,
         FailureType failureType,

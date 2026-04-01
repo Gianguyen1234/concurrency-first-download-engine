@@ -121,6 +121,7 @@ See:
 - [docs/architecture.md](docs/architecture.md)
 - [docs/flow-overview.vi.md](docs/flow-overview.vi.md)
 - [docs/job-snapshot-guide.vi.md](docs/job-snapshot-guide.vi.md)
+- [docs/retry-policy.vi.md](docs/retry-policy.vi.md)
 - [docs/roadmap.md](docs/roadmap.md)
 - [docs/profiling-guide.md](docs/profiling-guide.md)
 - [CHANGELOG.md](CHANGELOG.md)
