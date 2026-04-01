@@ -1,17 +1,16 @@
 package com.holydev.lab.multithreadediolab.app;
 
+import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
+import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
+import com.holydev.lab.multithreadediolab.domain.job.StartJobResponse;
 import com.holydev.lab.multithreadediolab.infra.download.ImageDownloaderService;
 import com.holydev.lab.multithreadediolab.infra.tracking.DownloadJobTracker;
-
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class DownloadJobService {
-
-    public record StartJobResponse(long jobId, int count, String baseUrl, String message) {
-    }
 
     private final DownloadJobTracker tracker;
     private final ImageDownloaderService imageDownloaderService;
@@ -21,6 +20,10 @@ public class DownloadJobService {
         this.imageDownloaderService = imageDownloaderService;
     }
 
+    // Đây là lớp điều phối use case "start job":
+    // 1) tạo job
+    // 2) đăng ký từng task vào tracker
+    // 3) đẩy từng task sang worker async để chạy nền
     public StartJobResponse startJob(int count, String baseUrl) {
         long jobId = tracker.startJob(baseUrl, count);
 
@@ -38,15 +41,16 @@ public class DownloadJobService {
         );
     }
 
-    public DownloadJobTracker.DownloadJobSnapshot getJob(long jobId) {
+    // Các hàm read-only bên dưới chỉ lấy snapshot đã được tracker tổng hợp sẵn.
+    public DownloadJobSnapshot getJob(long jobId) {
         return tracker.getJob(jobId);
     }
 
-    public DownloadJobTracker.DownloadJobSnapshot getLatestJob() {
+    public DownloadJobSnapshot getLatestJob() {
         return tracker.getLatestJob();
     }
 
-    public List<DownloadJobTracker.DownloadTaskSnapshot> getTasks(long jobId) {
+    public List<DownloadTaskSnapshot> getTasks(long jobId) {
         return tracker.getTasks(jobId);
     }
 }

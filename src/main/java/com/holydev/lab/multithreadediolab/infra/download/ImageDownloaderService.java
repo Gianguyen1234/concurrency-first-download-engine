@@ -1,5 +1,6 @@
 package com.holydev.lab.multithreadediolab.infra.download;
 
+import com.holydev.lab.multithreadediolab.domain.download.DownloadResult;
 import com.holydev.lab.multithreadediolab.infra.tracking.DownloadJobTracker;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -20,10 +21,7 @@ import java.util.concurrent.CompletableFuture;
 public class ImageDownloaderService {
     private final DownloadJobTracker tracker;
 
-    public record DownloadResult(int index, boolean ok, long bytes, long millis, String contentType, String error) {
-    }
-
-    // Save to project_dir/downloads
+    // Lưu file về thư mục downloads trong project để dễ kiểm tra trên máy local.
     private final String SAVE_DIR = System.getProperty("user.dir") + File.separator + "downloads" + File.separator;
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -31,10 +29,14 @@ public class ImageDownloaderService {
         this.tracker = tracker;
     }
 
+    // @Async nghĩa là method này không chạy trên thread HTTP request,
+    // mà chạy trên thread pool "imageTaskExecutor".
     @Async("imageTaskExecutor")
     public CompletableFuture<DownloadResult> downloadImage(String urlString, int index, long jobId) {
         long startNs = System.nanoTime();
         String threadName = Thread.currentThread().getName();
+
+        // Vừa vào worker thì đánh dấu task từ QUEUED -> RUNNING.
         tracker.markTaskRunning(jobId, index, threadName);
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -53,6 +55,7 @@ public class ImageDownloaderService {
             byte[] imageBytes = response.getBody();
             long millis = (System.nanoTime() - startNs) / 1_000_000;
 
+            // Chỉ ghi file khi response thật sự là ảnh.
             if (imageBytes != null && imageBytes.length > 0 && contentType != null && "image".equals(contentType.getType())) {
                 String ext = contentType.getSubtype().equalsIgnoreCase("jpeg") ? "jpg" : contentType.getSubtype();
                 Path path = Paths.get(SAVE_DIR + "image_" + index + "." + ext);
@@ -63,6 +66,7 @@ public class ImageDownloaderService {
                         " -> Saved image " + index + " (" + imageBytes.length + " bytes, " + contentType + ", " + millis + " ms)");
 
                 DownloadResult result = new DownloadResult(index, true, imageBytes.length, millis, contentType.toString(), null);
+                // Task thành công thì ghi kết quả vào tracker để job snapshot cập nhật ngay.
                 tracker.recordResult(jobId, result, threadName);
                 return CompletableFuture.completedFuture(result);
             }
@@ -71,6 +75,7 @@ public class ImageDownloaderService {
             String err = "Not an image: contentType=" + ct + ", bytes=" + (imageBytes == null ? 0 : imageBytes.length);
             System.err.println("Index " + index + " -> " + err);
             DownloadResult result = new DownloadResult(index, false, imageBytes == null ? 0 : imageBytes.length, millis, ct, err);
+            // Task fail vẫn phải record để job biết đã "xong" một đơn vị công việc.
             tracker.recordResult(jobId, result, threadName);
             return CompletableFuture.completedFuture(result);
         } catch (Exception e) {
@@ -78,6 +83,7 @@ public class ImageDownloaderService {
             String err = e.getClass().getSimpleName() + ": " + e.getMessage();
             System.err.println("Error at index " + index + ": " + err);
             DownloadResult result = new DownloadResult(index, false, 0, millis, null, err);
+            // Exception được quy về một DownloadResult thất bại để pipeline không bị đứt.
             tracker.recordResult(jobId, result, threadName);
             return CompletableFuture.completedFuture(result);
         }

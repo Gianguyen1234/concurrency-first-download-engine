@@ -1,7 +1,9 @@
 package com.holydev.lab.multithreadediolab.web;
 
 import com.holydev.lab.multithreadediolab.app.DownloadJobService;
-import com.holydev.lab.multithreadediolab.infra.tracking.DownloadJobTracker;
+import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
+import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
+import com.holydev.lab.multithreadediolab.domain.job.StartJobResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,31 +17,24 @@ public class DownloadController {
         this.jobService = jobService;
     }
 
+    // Endpoint mới: tạo một download job và trả jobId ngay, không chờ tải xong.
     @GetMapping("/jobs/start")
-    public DownloadJobService.StartJobResponse startJob(
+    public StartJobResponse startJob(
             @RequestParam(defaultValue = "50") int count,
             @RequestParam(defaultValue = "https://picsum.photos/300/300") String baseUrl
     ) {
         return jobService.startJob(count, baseUrl);
     }
 
+    // Xem snapshot tổng quan của 1 job: tổng task, queued, running, completed, ok, fail, throughput...
     @GetMapping("/jobs/{jobId}")
-    public DownloadJobTracker.DownloadJobSnapshot jobStatus(@PathVariable long jobId) {
+    public DownloadJobSnapshot jobStatus(@PathVariable long jobId) {
         return jobService.getJob(jobId);
     }
 
+    // Xem chi tiết từng task trong job để biết task nào đang queue/running/success/failed.
     @GetMapping("/jobs/{jobId}/tasks")
-    public java.util.List<DownloadJobTracker.DownloadTaskSnapshot> jobTasks(@PathVariable long jobId) {
+    public java.util.List<DownloadTaskSnapshot> jobTasks(@PathVariable long jobId) {
         return jobService.getTasks(jobId);
-    }
-
-    @GetMapping("/start-download")
-    public DownloadJobService.StartJobResponse legacyStart(@RequestParam(defaultValue = "50") int count) {
-        return jobService.startJob(count, "https://picsum.photos/300/300");
-    }
-
-    @GetMapping("/download-status")
-    public DownloadJobTracker.DownloadJobSnapshot legacyStatus() {
-        return jobService.getLatestJob();
     }
 }

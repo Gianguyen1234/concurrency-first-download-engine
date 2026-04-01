@@ -1,6 +1,9 @@
 package com.holydev.lab.multithreadediolab.infra.tracking;
 
-import com.holydev.lab.multithreadediolab.infra.download.ImageDownloaderService;
+import com.holydev.lab.multithreadediolab.domain.download.DownloadResult;
+import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
+import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
+import com.holydev.lab.multithreadediolab.domain.job.TaskStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -14,40 +17,12 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 public class DownloadJobTracker {
 
-    public record DownloadTaskSnapshot(
-            int index,
-            String url,
-            String status,
-            long bytes,
-            long millis,
-            String contentType,
-            String error,
-            String threadName
-    ) {
-    }
-
-    public record DownloadJobSnapshot(
-            long jobId,
-            String sourceBaseUrl,
-            int totalRequested,
-            int queued,
-            int running,
-            int completed,
-            int okCount,
-            int failCount,
-            long totalBytes,
-            long totalWallMillis,
-            double avgTaskMillis,
-            double throughputImagesPerSecond,
-            double throughputMegabytesPerSecond,
-            boolean finished
-    ) {
-    }
-
     private final AtomicLong jobIdSequence = new AtomicLong(1000);
+    // Lưu runtime state của nhiều job trong memory.
     private final Map<Long, JobRuntimeState> jobs = new ConcurrentHashMap<>();
     private volatile long latestJobId;
 
+    // Tạo 1 job mới và cấp jobId tăng dần để tiện test/demo.
     public long startJob(String sourceBaseUrl, int totalRequested) {
         long jobId = jobIdSequence.incrementAndGet();
         JobRuntimeState state = new JobRuntimeState(jobId, sourceBaseUrl, totalRequested);
@@ -70,7 +45,7 @@ public class DownloadJobTracker {
         }
     }
 
-    public void recordResult(long jobId, ImageDownloaderService.DownloadResult result, String threadName) {
+    public void recordResult(long jobId, DownloadResult result, String threadName) {
         JobRuntimeState state = jobs.get(jobId);
         if (state != null) {
             state.recordResult(result, threadName);
@@ -91,6 +66,7 @@ public class DownloadJobTracker {
         return state == null ? List.of() : state.taskSnapshots();
     }
 
+    // State nội bộ của 1 job. Dùng synchronized vì nhiều worker thread có thể update cùng lúc.
     private static final class JobRuntimeState {
         private final long jobId;
         private final String sourceBaseUrl;
@@ -113,39 +89,42 @@ public class DownloadJobTracker {
             this.startedAtNs = System.nanoTime();
         }
 
+        // Khi job vừa tạo, từng task được đưa vào trạng thái QUEUED trước.
         private synchronized void registerTask(int index, String url) {
             tasks.put(index, new TaskRuntimeState(index, url));
             queued++;
         }
 
+        // Worker lấy được task thì task chuyển từ QUEUED sang RUNNING.
         private synchronized void markTaskRunning(int index, String threadName) {
             TaskRuntimeState task = tasks.get(index);
-            if (task == null || !"QUEUED".equals(task.status)) {
+            if (task == null || task.status != TaskStatus.QUEUED) {
                 return;
             }
 
-            task.status = "RUNNING";
+            task.status = TaskStatus.RUNNING;
             task.threadName = threadName;
             queued--;
             running++;
         }
 
-        private synchronized void recordResult(ImageDownloaderService.DownloadResult result, String threadName) {
+        // Mọi đường đi cuối cùng đều đổ về đây: success hay fail đều tính là task đã hoàn tất.
+        private synchronized void recordResult(DownloadResult result, String threadName) {
             TaskRuntimeState task = tasks.get(result.index());
             if (task == null) {
                 return;
             }
 
-            if ("RUNNING".equals(task.status)) {
+            if (task.status == TaskStatus.RUNNING) {
                 running--;
-            } else if ("QUEUED".equals(task.status)) {
+            } else if (task.status == TaskStatus.QUEUED) {
                 queued--;
             }
 
             completed++;
             totalTaskMillis += result.millis();
 
-            task.status = result.ok() ? "SUCCESS" : "FAILED";
+            task.status = result.ok() ? TaskStatus.SUCCESS : TaskStatus.FAILED;
             task.bytes = result.bytes();
             task.millis = result.millis();
             task.contentType = result.contentType();
@@ -160,6 +139,7 @@ public class DownloadJobTracker {
             }
         }
 
+        // Snapshot này là thứ controller trả ra cho client.
         private synchronized DownloadJobSnapshot snapshot() {
             long totalWallMillis = (System.nanoTime() - startedAtNs) / 1_000_000;
             double totalSeconds = totalWallMillis / 1000.0;
@@ -186,6 +166,7 @@ public class DownloadJobTracker {
             );
         }
 
+        // Trả danh sách task theo index để JSON dễ đọc hơn.
         private synchronized List<DownloadTaskSnapshot> taskSnapshots() {
             List<DownloadTaskSnapshot> snapshots = new ArrayList<>();
             tasks.values().stream()
@@ -198,7 +179,8 @@ public class DownloadJobTracker {
     private static final class TaskRuntimeState {
         private final int index;
         private final String url;
-        private String status = "QUEUED";
+        // Task luôn bắt đầu ở QUEUED, sau đó mới RUNNING rồi SUCCESS/FAILED.
+        private TaskStatus status = TaskStatus.QUEUED;
         private long bytes;
         private long millis;
         private String contentType;
