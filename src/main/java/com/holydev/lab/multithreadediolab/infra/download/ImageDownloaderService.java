@@ -2,11 +2,13 @@ package com.holydev.lab.multithreadediolab.infra.download;
 
 import com.holydev.lab.multithreadediolab.domain.download.DownloadResult;
 import com.holydev.lab.multithreadediolab.infra.tracking.DownloadJobTracker;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -23,10 +25,15 @@ public class ImageDownloaderService {
 
     // Lưu file về thư mục downloads trong project để dễ kiểm tra trên máy local.
     private final String SAVE_DIR = System.getProperty("user.dir") + File.separator + "downloads" + File.separator;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
-    public ImageDownloaderService(DownloadJobTracker tracker) {
+    public ImageDownloaderService(
+            DownloadJobTracker tracker,
+            @Value("${app.download.connect-timeout-ms:3000}") int connectTimeoutMs,
+            @Value("${app.download.read-timeout-ms:10000}") int readTimeoutMs
+    ) {
         this.tracker = tracker;
+        this.restTemplate = createRestTemplate(connectTimeoutMs, readTimeoutMs);
     }
 
     // @Async nghĩa là method này không chạy trên thread HTTP request,
@@ -87,5 +94,12 @@ public class ImageDownloaderService {
             tracker.recordResult(jobId, result, threadName);
             return CompletableFuture.completedFuture(result);
         }
+    }
+
+    private RestTemplate createRestTemplate(int connectTimeoutMs, int readTimeoutMs) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeoutMs);
+        requestFactory.setReadTimeout(readTimeoutMs);
+        return new RestTemplate(requestFactory);
     }
 }

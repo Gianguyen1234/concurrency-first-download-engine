@@ -1,14 +1,14 @@
-# Hướng Dẫn Đọc Job Snapshot
+# HÆ°á»›ng Dáº«n Äá»c Job Snapshot
 
-Tài liệu này giải thích cách đọc response của `GET /jobs/{jobId}` trong project.
+TÃ i liá»‡u nÃ y giáº£i thÃ­ch cÃ¡ch Ä‘á»c response cá»§a `GET /jobs/{jobId}` trong project.
 
-## Đây là ảnh chụp tại thời điểm gọi API
+## ÄÃ¢y lÃ  áº£nh chá»¥p táº¡i thá»i Ä‘iá»ƒm gá»i API
 
-Snapshot của job là trạng thái tại **đúng thời điểm** bạn gọi endpoint.
+Snapshot cá»§a job lÃ  tráº¡ng thÃ¡i táº¡i **Ä‘Ãºng thá»i Ä‘iá»ƒm** báº¡n gá»i endpoint.
 
-Nó không nhất thiết là kết quả cuối cùng.
+NÃ³ khÃ´ng nháº¥t thiáº¿t lÃ  káº¿t quáº£ cuá»‘i cÃ¹ng.
 
-Ví dụ:
+VÃ­ dá»¥:
 
 ```json
 {
@@ -29,245 +29,245 @@ Ví dụ:
 }
 ```
 
-## Ý nghĩa từng thông số
+## Ã nghÄ©a tá»«ng thÃ´ng sá»‘
 
 ### `queued`
 
-Số task còn đang nằm trong hàng đợi, chưa được worker lấy ra chạy.
+Sá»‘ task cÃ²n Ä‘ang náº±m trong hÃ ng Ä‘á»£i, chÆ°a Ä‘Æ°á»£c worker láº¥y ra cháº¡y.
 
-Ví dụ `queued: 0` nghĩa là:
+VÃ­ dá»¥ `queued: 0` nghÄ©a lÃ :
 
-- không còn task nào chờ trong queue của job
-- các task đã được lấy ra hết để xử lý, hoặc đã xong
+- khÃ´ng cÃ²n task nÃ o chá» trong queue cá»§a job
+- cÃ¡c task Ä‘Ã£ Ä‘Æ°á»£c láº¥y ra háº¿t Ä‘á»ƒ xá»­ lÃ½, hoáº·c Ä‘Ã£ xong
 
 ### `running`
 
-Số task đang chạy tại thời điểm chụp snapshot.
+Sá»‘ task Ä‘ang cháº¡y táº¡i thá»i Ä‘iá»ƒm chá»¥p snapshot.
 
-Ví dụ `running: 8` nghĩa là có 8 task đang:
+VÃ­ dá»¥ `running: 8` nghÄ©a lÃ  cÃ³ 8 task Ä‘ang:
 
-- chờ mạng
-- nhận bytes
+- chá» máº¡ng
+- nháº­n bytes
 - ghi file
-- hoặc đang ở giữa quá trình xử lý
+- hoáº·c Ä‘ang á»Ÿ giá»¯a quÃ¡ trÃ¬nh xá»­ lÃ½
 
 ### `completed`
 
-Số task đã kết thúc.
+Sá»‘ task Ä‘Ã£ káº¿t thÃºc.
 
-Lưu ý:
+LÆ°u Ã½:
 
-- `completed` bao gồm cả `SUCCESS` và `FAILED`
+- `completed` bao gá»“m cáº£ `SUCCESS` vÃ  `FAILED`
 
-Ví dụ `completed: 42` nghĩa là đã có 42 task xong việc.
+VÃ­ dá»¥ `completed: 42` nghÄ©a lÃ  Ä‘Ã£ cÃ³ 42 task xong viá»‡c.
 
 ### `okCount`
 
-Số task thành công trong nhóm task đã hoàn thành.
+Sá»‘ task thÃ nh cÃ´ng trong nhÃ³m task Ä‘Ã£ hoÃ n thÃ nh.
 
-Ví dụ `okCount: 41` nghĩa là trong 42 task đã xong, có 41 task thành công.
+VÃ­ dá»¥ `okCount: 41` nghÄ©a lÃ  trong 42 task Ä‘Ã£ xong, cÃ³ 41 task thÃ nh cÃ´ng.
 
 ### `failCount`
 
-Số task thất bại trong nhóm task đã hoàn thành.
+Sá»‘ task tháº¥t báº¡i trong nhÃ³m task Ä‘Ã£ hoÃ n thÃ nh.
 
-Ví dụ `failCount: 1` nghĩa là trong 42 task đã xong, có 1 task lỗi.
+VÃ­ dá»¥ `failCount: 1` nghÄ©a lÃ  trong 42 task Ä‘Ã£ xong, cÃ³ 1 task lá»—i.
 
 ### `totalBytes`
 
-Tổng số byte tải thành công được tính đến thời điểm hiện tại.
+Tá»•ng sá»‘ byte táº£i thÃ nh cÃ´ng Ä‘Æ°á»£c tÃ­nh Ä‘áº¿n thá»i Ä‘iá»ƒm hiá»‡n táº¡i.
 
-Lưu ý:
+LÆ°u Ã½:
 
-- chỉ cộng các task `SUCCESS`
-- task `FAILED` không được cộng vào đây
+- chá»‰ cá»™ng cÃ¡c task `SUCCESS`
+- task `FAILED` khÃ´ng Ä‘Æ°á»£c cá»™ng vÃ o Ä‘Ã¢y
 
 ### `totalWallMillis`
 
-Thời gian thực ngoài đời của job, tính từ lúc bắt đầu job đến lúc chụp snapshot.
+Thá»i gian thá»±c ngoÃ i Ä‘á»i cá»§a job, tÃ­nh tá»« lÃºc báº¯t Ä‘áº§u job Ä‘áº¿n lÃºc chá»¥p snapshot.
 
-Ví dụ:
+VÃ­ dá»¥:
 
-- `22501 ms` xấp xỉ `22.5 giây`
+- `22501 ms` xáº¥p xá»‰ `22.5 giÃ¢y`
 
-Đây là **wall-clock time**, không phải tổng thời gian cộng dồn của từng task.
+ÄÃ¢y lÃ  **wall-clock time**, khÃ´ng pháº£i tá»•ng thá»i gian cá»™ng dá»“n cá»§a tá»«ng task.
 
 ### `avgTaskMillis`
 
-Thời gian trung bình của các task đã hoàn thành.
+Thá»i gian trung bÃ¬nh cá»§a cÃ¡c task Ä‘Ã£ hoÃ n thÃ nh.
 
-Công thức hiện tại:
+CÃ´ng thá»©c hiá»‡n táº¡i:
 
-- lấy tổng `millis` của các task đã xong
+- láº¥y tá»•ng `millis` cá»§a cÃ¡c task Ä‘Ã£ xong
 - chia cho `completed`
 
-Ví dụ:
+VÃ­ dá»¥:
 
 - `avgTaskMillis = 2821.95 ms`
-- xấp xỉ `2.82 giây/task`
+- xáº¥p xá»‰ `2.82 giÃ¢y/task`
 
 ### `throughputImagesPerSecond`
 
-Thông lượng theo số ảnh thành công trên mỗi giây.
+ThÃ´ng lÆ°á»£ng theo sá»‘ áº£nh thÃ nh cÃ´ng trÃªn má»—i giÃ¢y.
 
-Công thức gần đúng:
+CÃ´ng thá»©c gáº§n Ä‘Ãºng:
 
 - `okCount / totalWallSeconds`
 
-Ví dụ:
+VÃ­ dá»¥:
 
-- `41 / 22.501 ~= 1.82 ảnh/giây`
+- `41 / 22.501 ~= 1.82 áº£nh/giÃ¢y`
 
 ### `throughputMegabytesPerSecond`
 
-Thông lượng theo MB dữ liệu tải thành công trên mỗi giây.
+ThÃ´ng lÆ°á»£ng theo MB dá»¯ liá»‡u táº£i thÃ nh cÃ´ng trÃªn má»—i giÃ¢y.
 
-Nó trả lời câu hỏi:
+NÃ³ tráº£ lá»i cÃ¢u há»i:
 
-- hệ thống đang tải được bao nhiêu MB mỗi giây?
+- há»‡ thá»‘ng Ä‘ang táº£i Ä‘Æ°á»£c bao nhiÃªu MB má»—i giÃ¢y?
 
 ### `finished`
 
-Cho biết job đã xong toàn bộ hay chưa.
+Cho biáº¿t job Ä‘Ã£ xong toÃ n bá»™ hay chÆ°a.
 
-Ví dụ `finished: false` nghĩa là:
+VÃ­ dá»¥ `finished: false` nghÄ©a lÃ :
 
-- job vẫn chưa xong
-- vì `completed < totalRequested`
-- và vẫn còn task đang `running`
+- job váº«n chÆ°a xong
+- vÃ¬ `completed < totalRequested`
+- vÃ  váº«n cÃ²n task Ä‘ang `running`
 
-## Cách đọc nhanh cả cụm thông số
+## CÃ¡ch Ä‘á»c nhanh cáº£ cá»¥m thÃ´ng sá»‘
 
-Với snapshot ở trên, bạn có thể đọc như sau:
+Vá»›i snapshot á»Ÿ trÃªn, báº¡n cÃ³ thá»ƒ Ä‘á»c nhÆ° sau:
 
-- Job đã xử lý xong `42/50` task
-- Trong số đó `41` thành công, `1` thất bại
-- Không còn task nào chờ trong queue
-- Vẫn còn `8` task đang chạy
-- Đã tải được khoảng `633 KB`
-- Job đã chạy khoảng `22.5 giây`
-- Tốc độ hiện tại khoảng `1.82 ảnh/giây`
-- Job chưa hoàn tất
+- Job Ä‘Ã£ xá»­ lÃ½ xong `42/50` task
+- Trong sá»‘ Ä‘Ã³ `41` thÃ nh cÃ´ng, `1` tháº¥t báº¡i
+- KhÃ´ng cÃ²n task nÃ o chá» trong queue
+- Váº«n cÃ²n `8` task Ä‘ang cháº¡y
+- ÄÃ£ táº£i Ä‘Æ°á»£c khoáº£ng `633 KB`
+- Job Ä‘Ã£ cháº¡y khoáº£ng `22.5 giÃ¢y`
+- Tá»‘c Ä‘á»™ hiá»‡n táº¡i khoáº£ng `1.82 áº£nh/giÃ¢y`
+- Job chÆ°a hoÃ n táº¥t
 
-## Hai công thức rất dễ nhớ
+## Hai cÃ´ng thá»©c ráº¥t dá»… nhá»›
 
-### Công thức 1
+### CÃ´ng thá»©c 1
 
 `completed = okCount + failCount`
 
-Ví dụ:
+VÃ­ dá»¥:
 
 - `42 = 41 + 1`
 
-### Công thức 2
+### CÃ´ng thá»©c 2
 
 `totalRequested ~= queued + running + completed`
 
-Ví dụ:
+VÃ­ dá»¥:
 
 - `50 = 0 + 8 + 42`
 
-Hai công thức này rất hữu ích để tự kiểm tra snapshot có hợp lý hay không.
+Hai cÃ´ng thá»©c nÃ y ráº¥t há»¯u Ã­ch Ä‘á»ƒ tá»± kiá»ƒm tra snapshot cÃ³ há»£p lÃ½ hay khÃ´ng.
 
-## Chỗ dễ nhầm nhất: `avgTaskMillis` và `totalWallMillis`
+## Chá»— dá»… nháº§m nháº¥t: `avgTaskMillis` vÃ  `totalWallMillis`
 
-Hai số này **không cùng nghĩa**.
+Hai sá»‘ nÃ y **khÃ´ng cÃ¹ng nghÄ©a**.
 
 ### `avgTaskMillis`
 
-Đo độ trễ trung bình của từng task đã hoàn thành.
+Äo Ä‘á»™ trá»… trung bÃ¬nh cá»§a tá»«ng task Ä‘Ã£ hoÃ n thÃ nh.
 
-Đây là góc nhìn theo **task riêng lẻ**.
+ÄÃ¢y lÃ  gÃ³c nhÃ¬n theo **task riÃªng láº»**.
 
 ### `totalWallMillis`
 
-Đo thời gian thực ngoài đời của **cả job**.
+Äo thá»i gian thá»±c ngoÃ i Ä‘á»i cá»§a **cáº£ job**.
 
-Đây là góc nhìn theo **toàn bộ quá trình**.
+ÄÃ¢y lÃ  gÃ³c nhÃ¬n theo **toÃ n bá»™ quÃ¡ trÃ¬nh**.
 
-Vì task chạy song song nên:
+VÃ¬ task cháº¡y song song nÃªn:
 
-- wall time không bằng tổng thời gian của từng task cộng lại
+- wall time khÃ´ng báº±ng tá»•ng thá»i gian cá»§a tá»«ng task cá»™ng láº¡i
 
-Đây là dấu hiệu của concurrency.
+ÄÃ¢y lÃ  dáº¥u hiá»‡u cá»§a concurrency.
 
-## Vì sao `avgTaskMillis` có thể cao nhưng `throughput` vẫn khá?
+## VÃ¬ sao `avgTaskMillis` cÃ³ thá»ƒ cao nhÆ°ng `throughput` váº«n khÃ¡?
 
-Vì hai số này đo hai thứ khác nhau:
+VÃ¬ hai sá»‘ nÃ y Ä‘o hai thá»© khÃ¡c nhau:
 
-- `avgTaskMillis`: latency của từng task
-- `throughput`: năng suất toàn hệ thống
+- `avgTaskMillis`: latency cá»§a tá»«ng task
+- `throughput`: nÄƒng suáº¥t toÃ n há»‡ thá»‘ng
 
-## Ví dụ để hiểu
+## VÃ­ dá»¥ Ä‘á»ƒ hiá»ƒu
 
-Giả sử có 3 task, mỗi task mất 3 giây.
+Giáº£ sá»­ cÃ³ 3 task, má»—i task máº¥t 3 giÃ¢y.
 
-### Nếu chạy tuần tự
+### Náº¿u cháº¡y tuáº§n tá»±
 
 - task 1: 3s
 - task 2: 3s
 - task 3: 3s
 
-Tổng mất 9s.
+Tá»•ng máº¥t 9s.
 
 Throughput:
 
-- `3 ảnh / 9 giây = 0.33 ảnh/giây`
+- `3 áº£nh / 9 giÃ¢y = 0.33 áº£nh/giÃ¢y`
 
 Avg task:
 
-- vẫn là `3 giây/task`
+- váº«n lÃ  `3 giÃ¢y/task`
 
-### Nếu chạy song song
+### Náº¿u cháº¡y song song
 
-- cả 3 cùng bắt đầu
-- sau 3 giây, cả 3 cùng xong
+- cáº£ 3 cÃ¹ng báº¯t Ä‘áº§u
+- sau 3 giÃ¢y, cáº£ 3 cÃ¹ng xong
 
 Throughput:
 
-- `3 ảnh / 3 giây = 1 ảnh/giây`
+- `3 áº£nh / 3 giÃ¢y = 1 áº£nh/giÃ¢y`
 
 Avg task:
 
-- vẫn là `3 giây/task`
+- váº«n lÃ  `3 giÃ¢y/task`
 
-Kết luận:
+Káº¿t luáº­n:
 
-- `avgTaskMillis` không đổi
-- `throughput` tăng mạnh vì có song song
+- `avgTaskMillis` khÃ´ng Ä‘á»•i
+- `throughput` tÄƒng máº¡nh vÃ¬ cÃ³ song song
 
-## Tại sao điều này hợp lý trong bài toán I/O-bound?
+## Táº¡i sao Ä‘iá»u nÃ y há»£p lÃ½ trong bÃ i toÃ¡n I/O-bound?
 
-Với I/O-bound:
+Vá»›i I/O-bound:
 
-- task sống khá lâu
-- nhưng phần lớn thời gian là đang **chờ**
+- task sá»‘ng khÃ¡ lÃ¢u
+- nhÆ°ng pháº§n lá»›n thá»i gian lÃ  Ä‘ang **chá»**
 
-Ví dụ một task download ảnh mất 2.8 giây:
+VÃ­ dá»¥ má»™t task download áº£nh máº¥t 2.8 giÃ¢y:
 
-- một phần nhỏ là code Java thực sự chạy
-- phần lớn còn lại là:
-  - chờ DNS
-  - chờ kết nối TCP
-  - chờ server trả response
-  - chờ bytes đi qua mạng
-  - chờ ghi file
+- má»™t pháº§n nhá» lÃ  code Java thá»±c sá»± cháº¡y
+- pháº§n lá»›n cÃ²n láº¡i lÃ :
+  - chá» DNS
+  - chá» káº¿t ná»‘i TCP
+  - chá» server tráº£ response
+  - chá» bytes Ä‘i qua máº¡ng
+  - chá» ghi file
 
-Khi task A đang chờ I/O, task B, C, D vẫn có thể chạy song song trên các thread khác.
+Khi task A Ä‘ang chá» I/O, task B, C, D váº«n cÃ³ thá»ƒ cháº¡y song song trÃªn cÃ¡c thread khÃ¡c.
 
-Vì vậy:
+VÃ¬ váº­y:
 
-- latency của từng task có thể vẫn cao
-- throughput tổng thể vẫn được cải thiện nhiều
+- latency cá»§a tá»«ng task cÃ³ thá»ƒ váº«n cao
+- throughput tá»•ng thá»ƒ váº«n Ä‘Æ°á»£c cáº£i thiá»‡n nhiá»u
 
-Đó là lý do thread pool rất hợp với bài toán I/O-bound.
+ÄÃ³ lÃ  lÃ½ do thread pool ráº¥t há»£p vá»›i bÃ i toÃ¡n I/O-bound.
 
-## Cách nói ngắn gọn 
+## CÃ¡ch nÃ³i ngáº¯n gá»n 
 
-Bạn có thể nói:
+Báº¡n cÃ³ thá»ƒ nÃ³i:
 
-> Trong hệ thống concurrent, `avgTaskMillis` và `throughput` là hai chỉ số khác nhau. Mỗi task có thể mất vài giây vì phải chờ I/O, nhưng nhiều task chạy song song nên hệ thống vẫn hoàn thành được nhiều ảnh mỗi giây.
+> Trong há»‡ thá»‘ng concurrent, `avgTaskMillis` vÃ  `throughput` lÃ  hai chá»‰ sá»‘ khÃ¡c nhau. Má»—i task cÃ³ thá»ƒ máº¥t vÃ i giÃ¢y vÃ¬ pháº£i chá» I/O, nhÆ°ng nhiá»u task cháº¡y song song nÃªn há»‡ thá»‘ng váº«n hoÃ n thÃ nh Ä‘Æ°á»£c nhiá»u áº£nh má»—i giÃ¢y.
 
-Hoặc ngắn gọn hơn:
+Hoáº·c ngáº¯n gá»n hÆ¡n:
 
-> Một ảnh riêng lẻ vẫn chậm, nhưng nhiều ảnh chạy cùng lúc nên tổng năng suất của hệ thống vẫn cao.
+> Má»™t áº£nh riÃªng láº» váº«n cháº­m, nhÆ°ng nhiá»u áº£nh cháº¡y cÃ¹ng lÃºc nÃªn tá»•ng nÄƒng suáº¥t cá»§a há»‡ thá»‘ng váº«n cao.

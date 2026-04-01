@@ -20,14 +20,12 @@ public class DownloadJobTracker {
     private final AtomicLong jobIdSequence = new AtomicLong(1000);
     // Lưu runtime state của nhiều job trong memory.
     private final Map<Long, JobRuntimeState> jobs = new ConcurrentHashMap<>();
-    private volatile long latestJobId;
 
     // Tạo 1 job mới và cấp jobId tăng dần để tiện test/demo.
     public long startJob(String sourceBaseUrl, int totalRequested) {
         long jobId = jobIdSequence.incrementAndGet();
         JobRuntimeState state = new JobRuntimeState(jobId, sourceBaseUrl, totalRequested);
         jobs.put(jobId, state);
-        latestJobId = jobId;
         return jobId;
     }
 
@@ -57,10 +55,6 @@ public class DownloadJobTracker {
         return state == null ? null : state.snapshot();
     }
 
-    public DownloadJobSnapshot getLatestJob() {
-        return latestJobId == 0 ? null : getJob(latestJobId);
-    }
-
     public List<DownloadTaskSnapshot> getTasks(long jobId) {
         JobRuntimeState state = jobs.get(jobId);
         return state == null ? List.of() : state.taskSnapshots();
@@ -81,6 +75,7 @@ public class DownloadJobTracker {
         private int failCount;
         private long totalBytes;
         private long totalTaskMillis;
+        private long finishedAtNs;
 
         private JobRuntimeState(long jobId, String sourceBaseUrl, int totalRequested) {
             this.jobId = jobId;
@@ -137,11 +132,16 @@ public class DownloadJobTracker {
             } else {
                 failCount++;
             }
+
+            if (finishedAtNs == 0 && totalRequested > 0 && completed >= totalRequested) {
+                finishedAtNs = System.nanoTime();
+            }
         }
 
         // Snapshot này là thứ controller trả ra cho client.
         private synchronized DownloadJobSnapshot snapshot() {
-            long totalWallMillis = (System.nanoTime() - startedAtNs) / 1_000_000;
+            long endAtNs = finishedAtNs != 0 ? finishedAtNs : System.nanoTime();
+            long totalWallMillis = (endAtNs - startedAtNs) / 1_000_000;
             double totalSeconds = totalWallMillis / 1000.0;
             double avgTaskMillis = completed == 0 ? 0 : (double) totalTaskMillis / completed;
             double throughputImagesPerSecond = totalSeconds == 0 ? 0 : okCount / totalSeconds;
