@@ -2,6 +2,7 @@ package com.holydev.lab.multithreadediolab.app;
 
 import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
+import com.holydev.lab.multithreadediolab.domain.job.JobFailureSummary;
 import com.holydev.lab.multithreadediolab.domain.job.StartJobResponse;
 import com.holydev.lab.multithreadediolab.infra.download.ImageDownloaderService;
 import com.holydev.lab.multithreadediolab.infra.tracking.DownloadJobTracker;
@@ -52,6 +53,10 @@ public class DownloadJobService {
 
     public List<DownloadTaskSnapshot> getTasks(long jobId) {
         return tracker.getTasks(jobId);
+    }
+
+    public JobFailureSummary getFailureSummary(long jobId) {
+        return tracker.getFailureSummary(jobId);
     }
 
     private void validateBaseUrl(String baseUrl) {

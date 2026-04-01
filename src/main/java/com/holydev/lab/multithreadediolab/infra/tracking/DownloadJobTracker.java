@@ -4,11 +4,13 @@ import com.holydev.lab.multithreadediolab.domain.download.DownloadResult;
 import com.holydev.lab.multithreadediolab.domain.download.FailureType;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
+import com.holydev.lab.multithreadediolab.domain.job.JobFailureSummary;
 import com.holydev.lab.multithreadediolab.domain.job.TaskStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +68,11 @@ public class DownloadJobTracker {
     public List<DownloadTaskSnapshot> getTasks(long jobId) {
         JobRuntimeState state = jobs.get(jobId);
         return state == null ? List.of() : state.taskSnapshots();
+    }
+
+    public JobFailureSummary getFailureSummary(long jobId) {
+        JobRuntimeState state = jobs.get(jobId);
+        return state == null ? null : state.failureSummary();
     }
 
     // State nội bộ của 1 job. Dùng synchronized vì nhiều worker thread có thể update cùng lúc.
@@ -196,6 +203,42 @@ public class DownloadJobTracker {
                     .sorted(Comparator.comparingInt(task -> task.index))
                     .forEach(task -> snapshots.add(task.snapshot()));
             return snapshots;
+        }
+
+        private synchronized JobFailureSummary failureSummary() {
+            Map<FailureType, Integer> failureCounts = new EnumMap<>(FailureType.class);
+            int failedTasks = 0;
+            int retriedTasks = 0;
+            int successfulAfterRetry = 0;
+
+            for (TaskRuntimeState task : tasks.values()) {
+                if (task.retryCount > 0) {
+                    retriedTasks++;
+                    if (task.status == TaskStatus.SUCCESS) {
+                        successfulAfterRetry++;
+                    }
+                }
+
+                if (task.status == TaskStatus.FAILED) {
+                    failedTasks++;
+                    FailureType failureType = task.failureType == null ? FailureType.UNKNOWN : task.failureType;
+                    failureCounts.merge(failureType, 1, Integer::sum);
+                }
+            }
+
+            Map<String, Integer> failureCountsView = new LinkedHashMap<>();
+            for (Map.Entry<FailureType, Integer> entry : failureCounts.entrySet()) {
+                failureCountsView.put(entry.getKey().name(), entry.getValue());
+            }
+
+            return new JobFailureSummary(
+                    jobId,
+                    tasks.size(),
+                    failedTasks,
+                    retriedTasks,
+                    successfulAfterRetry,
+                    failureCountsView
+            );
         }
     }
 

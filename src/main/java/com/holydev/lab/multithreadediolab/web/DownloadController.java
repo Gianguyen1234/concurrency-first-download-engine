@@ -3,6 +3,7 @@ package com.holydev.lab.multithreadediolab.web;
 import com.holydev.lab.multithreadediolab.app.DownloadJobService;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
+import com.holydev.lab.multithreadediolab.domain.job.JobFailureSummary;
 import com.holydev.lab.multithreadediolab.domain.job.StartJobResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,5 +37,11 @@ public class DownloadController {
     @GetMapping("/jobs/{jobId}/tasks")
     public java.util.List<DownloadTaskSnapshot> jobTasks(@PathVariable long jobId) {
         return jobService.getTasks(jobId);
+    }
+
+    // Gom nhanh thong ke fail/retry cua mot job de doc tinh hinh reliability.
+    @GetMapping("/jobs/{jobId}/failure-summary")
+    public JobFailureSummary jobFailureSummary(@PathVariable long jobId) {
+        return jobService.getFailureSummary(jobId);
     }
 }
