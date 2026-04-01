@@ -29,6 +29,7 @@ public class PoolStatusController {
     ) {
     }
 
+    // Endpoint này nhìn "bên trong" thread pool để biết executor đang bận cỡ nào.
     @GetMapping("/pool-status")
     public PoolStatus poolStatus() {
         ThreadPoolExecutor executor = imageTaskExecutor.getThreadPoolExecutor();

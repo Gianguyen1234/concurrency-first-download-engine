@@ -12,6 +12,8 @@ public class AsyncConfig {
     @Bean(name = "imageTaskExecutor")
     public ThreadPoolTaskExecutor taskExecutor() {
         int cores = Runtime.getRuntime().availableProcessors();
+        // Với I/O-bound, số thread thường có thể lớn hơn số core
+        // vì nhiều thread sẽ dành phần lớn thời gian để chờ mạng / chờ ghi file.
         int corePool = Math.max(2, cores * 2);
         int maxPool = Math.max(corePool, cores * 5);
 

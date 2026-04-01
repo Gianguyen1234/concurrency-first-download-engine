@@ -45,11 +45,6 @@ Current endpoints:
 - `GET /jobs/{jobId}/tasks`
 - `GET /pool-status`
 
-Legacy compatibility endpoints:
-
-- `GET /start-download`
-- `GET /download-status`
-
 ## Project Structure
 
 Current source layout:
@@ -59,6 +54,14 @@ src/main/java/com/holydev/lab/multithreadediolab
   ConcurrencyFirstDownloadEngineApplication.java
   app/
     DownloadJobService.java
+  domain/
+    download/
+      DownloadResult.java
+    job/
+      DownloadJobSnapshot.java
+      DownloadTaskSnapshot.java
+      StartJobResponse.java
+      TaskStatus.java
   infra/
     async/
       AsyncConfig.java
@@ -116,6 +119,8 @@ This project is meant to stay around long enough to answer questions like:
 See:
 
 - [docs/architecture.md](docs/architecture.md)
+- [docs/flow-overview.vi.md](docs/flow-overview.vi.md)
+- [docs/job-snapshot-guide.vi.md](docs/job-snapshot-guide.vi.md)
 - [docs/roadmap.md](docs/roadmap.md)
 - [docs/profiling-guide.md](docs/profiling-guide.md)
 - [CHANGELOG.md](CHANGELOG.md)
