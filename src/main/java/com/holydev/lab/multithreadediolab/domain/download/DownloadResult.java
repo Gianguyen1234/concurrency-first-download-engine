@@ -6,6 +6,7 @@ public record DownloadResult(
         long bytes,
         long millis,
         String contentType,
-        String error
+        String error,
+        FailureType failureType
 ) {
 }

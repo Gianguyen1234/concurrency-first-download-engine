@@ -1,5 +1,7 @@
 package com.holydev.lab.multithreadediolab.domain.job;
 
+import com.holydev.lab.multithreadediolab.domain.download.FailureType;
+
 public record DownloadTaskSnapshot(
         int index,
         String url,
@@ -8,6 +10,7 @@ public record DownloadTaskSnapshot(
         long millis,
         String contentType,
         String error,
+        FailureType failureType,
         String threadName
 ) {
 }

@@ -124,6 +124,7 @@ public class DownloadJobTracker {
             task.millis = result.millis();
             task.contentType = result.contentType();
             task.error = result.error();
+            task.failureType = result.failureType();
             task.threadName = threadName;
 
             if (result.ok()) {
@@ -185,6 +186,7 @@ public class DownloadJobTracker {
         private long millis;
         private String contentType;
         private String error;
+        private com.holydev.lab.multithreadediolab.domain.download.FailureType failureType;
         private String threadName;
 
         private TaskRuntimeState(int index, String url) {
@@ -193,7 +195,7 @@ public class DownloadJobTracker {
         }
 
         private DownloadTaskSnapshot snapshot() {
-            return new DownloadTaskSnapshot(index, url, status, bytes, millis, contentType, error, threadName);
+            return new DownloadTaskSnapshot(index, url, status, bytes, millis, contentType, error, failureType, threadName);
         }
     }
 }
