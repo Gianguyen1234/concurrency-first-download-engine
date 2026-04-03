@@ -1,6 +1,7 @@
 package com.holydev.lab.multithreadediolab.web;
 
 import com.holydev.lab.multithreadediolab.app.DownloadJobService;
+import com.holydev.lab.multithreadediolab.domain.benchmark.BenchmarkReport;
 import com.holydev.lab.multithreadediolab.domain.job.CancelJobResponse;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
@@ -51,5 +52,16 @@ public class DownloadController {
     @PostMapping("/jobs/{jobId}/cancel")
     public CancelJobResponse cancelJob(@PathVariable long jobId) {
         return jobService.cancelJob(jobId);
+    }
+
+    // Chay mot benchmark nho: tao job, doi den khi xong hoac timeout, roi tra report tong hop.
+    @GetMapping("/benchmarks/run")
+    public BenchmarkReport runBenchmark(
+            @RequestParam(defaultValue = "50") int count,
+            @RequestParam(defaultValue = "https://picsum.photos/300/300") String baseUrl,
+            @RequestParam(defaultValue = "200") long pollIntervalMs,
+            @RequestParam(defaultValue = "60000") long timeoutMillis
+    ) {
+        return jobService.runBenchmark(count, baseUrl, pollIntervalMs, timeoutMillis);
     }
 }

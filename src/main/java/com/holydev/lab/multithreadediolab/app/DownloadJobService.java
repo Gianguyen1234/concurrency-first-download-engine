@@ -1,5 +1,6 @@
 package com.holydev.lab.multithreadediolab.app;
 
+import com.holydev.lab.multithreadediolab.domain.benchmark.BenchmarkReport;
 import com.holydev.lab.multithreadediolab.domain.job.CancelJobResponse;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadJobSnapshot;
 import com.holydev.lab.multithreadediolab.domain.job.DownloadTaskSnapshot;
@@ -13,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class DownloadJobService {
@@ -68,6 +70,61 @@ public class DownloadJobService {
         return response;
     }
 
+    public BenchmarkReport runBenchmark(int count, String baseUrl, long pollIntervalMs, long timeoutMillis) {
+        long safePollIntervalMs = Math.max(50, pollIntervalMs);
+        long safeTimeoutMillis = Math.max(safePollIntervalMs, timeoutMillis);
+
+        StartJobResponse startJobResponse = startJob(count, baseUrl);
+        long jobId = startJobResponse.jobId();
+        long startedAtNs = System.nanoTime();
+        boolean timedOut = false;
+        boolean cancelledOnTimeout = false;
+
+        while (true) {
+            DownloadJobSnapshot snapshot = getJob(jobId);
+            if (snapshot == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "job not found during benchmark");
+            }
+
+            if (snapshot.finished()) {
+                return new BenchmarkReport(
+                        jobId,
+                        count,
+                        baseUrl,
+                        safePollIntervalMs,
+                        safeTimeoutMillis,
+                        false,
+                        false,
+                        snapshot,
+                        getFailureSummary(jobId),
+                        "Benchmark completed successfully."
+                );
+            }
+
+            long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNs);
+            if (elapsedMillis >= safeTimeoutMillis) {
+                timedOut = true;
+                cancelJob(jobId);
+                cancelledOnTimeout = true;
+                DownloadJobSnapshot finalSnapshot = getJob(jobId);
+                return new BenchmarkReport(
+                        jobId,
+                        count,
+                        baseUrl,
+                        safePollIntervalMs,
+                        safeTimeoutMillis,
+                        timedOut,
+                        cancelledOnTimeout,
+                        finalSnapshot,
+                        getFailureSummary(jobId),
+                        "Benchmark timed out before the job finished. The job was cancelled to stop remaining queued work."
+                );
+            }
+
+            sleepQuietly(safePollIntervalMs);
+        }
+    }
+
     private void validateBaseUrl(String baseUrl) {
         String trimmed = baseUrl == null ? "" : baseUrl.trim();
         if (trimmed.isEmpty()) {
@@ -88,6 +145,15 @@ public class DownloadJobService {
 
         if (!uri.isAbsolute() || uri.getHost() == null || uri.getHost().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "baseUrl must be an absolute HTTP(S) URL");
+        }
+    }
+
+    private void sleepQuietly(long millis) {
+        try {
+            TimeUnit.MILLISECONDS.sleep(millis);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "benchmark wait was interrupted");
         }
     }
 }
