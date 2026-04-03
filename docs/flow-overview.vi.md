@@ -1,342 +1,410 @@
-# Tá»•ng Quan Luá»“ng Cháº¡y
+# Tổng Quan Luồng Chạy
 
-TÃ i liá»‡u nÃ y giáº£i thÃ­ch luá»“ng cháº¡y chÃ­nh cá»§a project theo thá»© tá»±:
+Tài liệu này giải thích luồng chạy chính của project theo thứ tự:
 
 - controller
-- service Ä‘iá»u phá»‘i
+- service điều phối
 - async worker
 - tracker
-- snapshot tráº£ vá» cho client
+- snapshot trả về cho client
 
-Má»¥c tiÃªu lÃ  giÃºp báº¡n nhÃ¬n há»‡ thá»‘ng nhÆ° má»™t cÃ¢u chuyá»‡n liá»n máº¡ch, thay vÃ¬ chá»‰ tháº¥y nhiá»u class rá»i ráº¡c.
+Mục tiêu là giúp bạn nhìn hệ thống như một câu chuyện liền mạch, thay vì chỉ thấy nhiều class rời rạc.
 
-## Bá»©c tranh lá»›n
+## Bức tranh lớn
 
-Khi client gá»i:
+Khi client gọi:
 
 ```http
 GET /jobs/start?count=10&baseUrl=https://picsum.photos/300/300
 ```
 
-thÃ¬ há»‡ thá»‘ng khÃ´ng táº£i Ä‘á»“ng bá»™ ngay trÃªn thread HTTP.
+thì hệ thống không tải đồng bộ ngay trên thread HTTP.
 
-Thay vÃ o Ä‘Ã³, nÃ³ lÃ m nhÆ° sau:
+Thay vào đó, nó làm như sau:
 
-1. Controller nháº­n request.
-2. Service táº¡o má»™t `job` má»›i.
-3. Service sinh ra nhiá»u `task` con.
-4. Má»—i task Ä‘Æ°á»£c Ä‘áº©y sang worker async.
-5. Worker táº£i áº£nh vÃ  ghi file.
-6. Tracker cáº­p nháº­t tráº¡ng thÃ¡i cá»§a tá»«ng task vÃ  cáº£ job.
-7. Client gá»i endpoint status Ä‘á»ƒ xem snapshot hiá»‡n táº¡i.
+1. Controller nhận request.
+2. Service tạo một `job` mới.
+3. Service sinh ra nhiều `task` con.
+4. Mỗi task được đẩy sang worker async.
+5. Worker tải ảnh và ghi file.
+6. Tracker cập nhật trạng thái của từng task và cả job.
+7. Client gọi endpoint status để xem snapshot hiện tại.
 
-## 1. Controller lÃ m gÃ¬?
+## 1. Controller làm gì?
 
-File chÃ­nh:
+File chính:
 
 - `DownloadController`
 
-Vai trÃ² cá»§a controller lÃ :
+Vai trò của controller là:
 
-- nháº­n HTTP request
-- tÃ¡ch input tá»« query params
-- gá»i sang service
-- tráº£ response JSON vá» cho client
+- nhận HTTP request
+- tách input từ query params
+- gọi sang service
+- trả response JSON về cho client
 
-Controller **khÃ´ng nÃªn** lÃ  nÆ¡i chá»©a logic táº£i áº£nh tháº­t sá»±.
+Controller **không nên** là nơi chứa logic tải ảnh thật sự.
 
-VÃ­ dá»¥ endpoint:
+Ví dụ endpoint:
 
 - `GET /jobs/start`
 - `GET /jobs/{jobId}`
 - `GET /jobs/{jobId}/tasks`
+- `GET /jobs/{jobId}/failure-summary`
+- `POST /jobs/{jobId}/cancel`
+- `GET /benchmarks/run`
 
-### Ã nghÄ©a tá»«ng endpoint
+### Ý nghĩa từng endpoint
 
 #### `GET /jobs/start`
 
-DÃ¹ng Ä‘á»ƒ báº¯t Ä‘áº§u má»™t job má»›i.
+Dùng để bắt đầu một job mới.
 
-NÃ³ tráº£ vá» ráº¥t nhanh vá»›i:
+Nó trả về rất nhanh với:
 
 - `jobId`
 - `count`
 - `baseUrl`
 - `message`
 
-NÃ³ **khÃ´ng chá» táº£i xong**.
+Nó **không chờ tải xong**.
 
-ÄÃ¢y lÃ  Ä‘iá»ƒm ráº¥t quan trá»ng trong thiáº¿t káº¿ async.
+Đây là điểm rất quan trọng trong thiết kế async.
 
 #### `GET /jobs/{jobId}`
 
-Tráº£ vá» snapshot tá»•ng quan cá»§a job:
+Trả về snapshot tổng quan của job:
 
-- cÃ²n bao nhiÃªu task Ä‘ang queue
-- bao nhiÃªu task Ä‘ang cháº¡y
-- Ä‘Ã£ xong bao nhiÃªu
-- thÃ nh cÃ´ng bao nhiÃªu
-- tháº¥t báº¡i bao nhiÃªu
-- throughput hiá»‡n táº¡i ra sao
+- còn bao nhiêu task đang queue
+- bao nhiêu task đang chạy
+- đã xong bao nhiêu
+- thành công bao nhiêu
+- thất bại bao nhiêu
+- bị hủy bao nhiêu
+- throughput hiện tại ra sao
 
 #### `GET /jobs/{jobId}/tasks`
 
-Tráº£ vá» chi tiáº¿t tá»«ng task:
+Trả về chi tiết từng task:
 
-- URL nÃ o Ä‘ang cháº¡y
-- task nÃ o tháº¥t báº¡i
-- lá»—i gÃ¬
-- thread nÃ o xá»­ lÃ½ task Ä‘Ã³
-- máº¥t bao nhiÃªu mili giÃ¢y
+- URL nào đang chạy
+- task nào thất bại
+- lỗi gì
+- failure type là gì
+- retry bao nhiêu lần
+- thread nào xử lý task đó
+- mất bao nhiêu mili giây
 
-## 2. Service Ä‘iá»u phá»‘i lÃ m gÃ¬?
+#### `GET /jobs/{jobId}/failure-summary`
 
-File chÃ­nh:
+Trả về thống kê lỗi và retry của riêng job đó.
+
+#### `POST /jobs/{jobId}/cancel`
+
+Dùng để yêu cầu hủy job.
+
+Semantics hiện tại là:
+
+- task còn `QUEUED` sẽ thành `CANCELLED`
+- task đang chạy được phép kết thúc attempt hiện tại
+- retry trong tương lai bị chặn
+
+#### `GET /benchmarks/run`
+
+Dùng để chạy benchmark đơn giản bằng chính engine hiện tại.
+
+Endpoint này sẽ:
+
+- tạo một job
+- chờ job hoàn tất hoặc timeout
+- trả về report JSON tổng hợp
+
+## 2. Service điều phối làm gì?
+
+File chính:
 
 - `DownloadJobService`
 
-ÄÃ¢y lÃ  lá»›p orchestration, tá»©c lÃ  lá»›p Ä‘iá»u phá»‘i use case.
+Đây là lớp orchestration, tức là lớp điều phối use case.
 
-NÃ³ khÃ´ng trá»±c tiáº¿p táº£i áº£nh tá»«ng byte, mÃ  chá»‹u trÃ¡ch nhiá»‡m tá»• chá»©c cÃ´ng viá»‡c.
+Nó không trực tiếp tải ảnh từng byte, mà chịu trách nhiệm tổ chức công việc.
 
-Khi `startJob(count, baseUrl)` Ä‘Æ°á»£c gá»i, service lÃ m 3 viá»‡c:
+Khi `startJob(count, baseUrl)` được gọi, service làm 3 việc:
 
-1. Táº¡o má»™t job má»›i trong tracker.
-2. Sinh ra cÃ¡c task con tá»« `count` vÃ  `baseUrl`.
-3. Gá»i worker async Ä‘á»ƒ thá»±c thi tá»«ng task.
+1. Tạo một job mới trong tracker.
+2. Sinh ra các task con từ `count` và `baseUrl`.
+3. Gọi worker async để thực thi từng task.
 
-VÃ­ dá»¥ náº¿u:
+Ví dụ nếu:
 
 - `count = 3`
 - `baseUrl = https://picsum.photos/300/300`
 
-thÃ¬ service sáº½ sinh ra 3 URL:
+thì service sẽ sinh ra 3 URL:
 
 - `https://picsum.photos/300/300?random=0`
 - `https://picsum.photos/300/300?random=1`
 - `https://picsum.photos/300/300?random=2`
 
-Má»—i URL tÆ°Æ¡ng á»©ng vá»›i má»™t task.
+Mỗi URL tương ứng với một task.
 
-## 3. Async worker lÃ m gÃ¬?
+Ngoài `startJob`, service hiện còn điều phối:
 
-File chÃ­nh:
+- lấy snapshot job
+- lấy danh sách task
+- lấy failure summary
+- cancel job
+- chạy benchmark mode
+
+## 3. Async worker làm gì?
+
+File chính:
 
 - `ImageDownloaderService`
 
-ÄÃ¢y lÃ  nÆ¡i cÃ´ng viá»‡c tháº­t sá»± Ä‘Æ°á»£c thá»±c hiá»‡n.
+Đây là nơi công việc thật sự được thực hiện.
 
-Worker lÃ m cÃ¡c viá»‡c sau:
+Worker làm các việc sau:
 
-1. ÄÃ¡nh dáº¥u task tá»« `QUEUED` sang `RUNNING`.
-2. Gá»i HTTP tá»›i URL cáº§n táº£i.
-3. Kiá»ƒm tra `Content-Type` cÃ³ Ä‘Ãºng lÃ  áº£nh hay khÃ´ng.
-4. Ghi file xuá»‘ng thÆ° má»¥c `downloads`.
-5. Táº¡o `DownloadResult`.
-6. BÃ¡o káº¿t quáº£ vá» tracker.
+1. Đánh dấu task từ `QUEUED` sang `RUNNING`.
+2. Gọi HTTP tới URL cần tải.
+3. Kiểm tra `Content-Type` có đúng là ảnh hay không.
+4. Ghi file xuống thư mục `downloads`.
+5. Tạo `DownloadResult`.
+6. Báo kết quả về tracker.
 
-### VÃ¬ sao gá»i lÃ  async worker?
+### Vì sao gọi là async worker?
 
-VÃ¬ method nÃ y Ä‘Æ°á»£c Ä‘Ã¡nh dáº¥u:
+Vì method này được đánh dấu:
 
 ```java
 @Async("imageTaskExecutor")
 ```
 
-Äiá»u Ä‘Ã³ cÃ³ nghÄ©a lÃ  method sáº½ cháº¡y trÃªn thread pool, khÃ´ng cháº¡y trÃªn thread HTTP request ban Ä‘áº§u.
+Điều đó có nghĩa là method sẽ chạy trên thread pool, không chạy trên thread HTTP request ban đầu.
 
-NÃ³i Ä‘Æ¡n giáº£n:
+Nói đơn giản:
 
-- request web chá»‰ cÃ³ nhiá»‡m vá»¥ khá»Ÿi Ä‘á»™ng cÃ´ng viá»‡c
-- worker async má»›i lÃ  nÆ¡i tháº­t sá»± Ä‘i táº£i áº£nh
+- request web chỉ có nhiệm vụ khởi động công việc
+- worker async mới là nơi thật sự đi tải ảnh
 
-## 4. Thread pool tham gia á»Ÿ Ä‘Ã¢u?
+### Worker hiện đã có thêm gì?
 
-File chÃ­nh:
+Ngoài download cơ bản, worker hiện còn có:
+
+- timeout HTTP
+- failure classification
+- retry policy cho lỗi tạm thời
+- cancel-aware behavior ở mức an toàn
+
+## 4. Thread pool tham gia ở đâu?
+
+File chính:
 
 - `AsyncConfig`
 
-á»ž Ä‘Ã¢y ta táº¡o bean `imageTaskExecutor` báº±ng `ThreadPoolTaskExecutor`.
+Ở đây ta tạo bean `imageTaskExecutor` bằng `ThreadPoolTaskExecutor`.
 
-Thread pool cÃ³ nhiá»‡m vá»¥:
+Thread pool có nhiệm vụ:
 
-- giá»¯ sáºµn má»™t nhÃ³m worker thread
-- task nÃ o Ä‘áº¿n thÃ¬ phÃ¢n cho worker ráº£nh
-- náº¿u chÆ°a tá»›i lÆ°á»£t thÃ¬ task náº±m trong queue
+- giữ sẵn một nhóm worker thread
+- task nào đến thì phân cho worker rảnh
+- nếu chưa tới lượt thì task nằm trong queue
 
-CÃ¡c thÃ´ng sá»‘ nhÆ°:
+Các thông số như:
 
 - `corePoolSize`
 - `maxPoolSize`
 - `queueCapacity`
 
-áº£nh hÆ°á»Ÿng trá»±c tiáº¿p Ä‘áº¿n cÃ¡ch task Ä‘Æ°á»£c xá»­ lÃ½.
+ảnh hưởng trực tiếp đến cách task được xử lý.
 
-### VÃ¬ sao bÃ i nÃ y há»£p vá»›i thread pool?
+### Vì sao bài này hợp với thread pool?
 
-VÃ¬ Ä‘Ã¢y lÃ  bÃ i toÃ¡n I/O-bound.
+Vì đây là bài toán I/O-bound.
 
-Má»—i task táº£i áº£nh thÆ°á»ng tá»‘n nhiá»u thá»i gian chá»:
+Mỗi task tải ảnh thường tốn nhiều thời gian chờ:
 
-- chá» máº¡ng
-- chá» server
-- chá» response
-- chá» ghi file
+- chờ mạng
+- chờ server
+- chờ response
+- chờ ghi file
 
-Khi task A Ä‘ang chá» máº¡ng, thread pool váº«n cÃ³ thá»ƒ cho task B hoáº·c C cháº¡y trÃªn thread khÃ¡c.
+Khi task A đang chờ mạng, thread pool vẫn có thể cho task B hoặc C chạy trên thread khác.
 
-## 5. Tracker lÃ m gÃ¬?
+## 5. Tracker làm gì?
 
-File chÃ­nh:
+File chính:
 
 - `DownloadJobTracker`
 
-Tracker lÃ  nÆ¡i giá»¯ runtime state trong memory.
+Tracker là nơi giữ runtime state trong memory.
 
-NÃ³ biáº¿t:
+Nó biết:
 
-- hiá»‡n cÃ³ nhá»¯ng job nÃ o
-- má»—i job cÃ³ nhá»¯ng task nÃ o
-- task nÃ o Ä‘ang `QUEUED`
-- task nÃ o Ä‘ang `RUNNING`
-- task nÃ o `SUCCESS`
-- task nÃ o `FAILED`
+- hiện có những job nào
+- mỗi job có những task nào
+- task nào đang `QUEUED`
+- task nào đang `RUNNING`
+- task nào `SUCCESS`
+- task nào `FAILED`
+- task nào `CANCELLED`
 
-### VÃ¬ sao cáº§n tracker?
+### Vì sao cần tracker?
 
-Náº¿u khÃ´ng cÃ³ tracker, há»‡ thá»‘ng chá»‰ biáº¿t:
+Nếu không có tracker, hệ thống chỉ biết:
 
-- task Ä‘Ã£ cháº¡y
-- log cÃ³ in ra console
+- task đã chạy
+- log có in ra console
 
-NhÆ°ng sáº½ khÃ´ng tráº£ lá»i Ä‘Æ°á»£c cÃ¡c cÃ¢u há»i nhÆ°:
+Nhưng sẽ không trả lời được các câu hỏi như:
 
-- job `1001` Ä‘ang tá»›i Ä‘Ã¢u rá»“i?
-- task nÃ o fail?
-- task nÃ o Ä‘ang cháº¡y?
-- Ä‘Ã£ táº£i Ä‘Æ°á»£c bao nhiÃªu byte?
-- throughput hiá»‡n táº¡i lÃ  bao nhiÃªu?
+- job `1001` đang tới đâu rồi?
+- task nào fail?
+- task nào đang chạy?
+- đã tải được bao nhiêu byte?
+- throughput hiện tại là bao nhiêu?
+- đã retry bao nhiêu task?
+- có task nào bị cancel không?
 
-Tracker chÃ­nh lÃ  â€œsá»• theo dÃµi tiáº¿n Ä‘á»™â€ cá»§a há»‡ thá»‘ng.
+Tracker chính là “sổ theo dõi tiến độ” của hệ thống.
 
-### VÃ¬ sao tracker dÃ¹ng `synchronized`?
+### Vì sao tracker dùng `synchronized`?
 
-VÃ¬ nhiá»u worker thread cÃ³ thá»ƒ cÃ¹ng lÃºc cáº­p nháº­t cÃ¹ng má»™t job.
+Vì nhiều worker thread có thể cùng lúc cập nhật cùng một job.
 
-VÃ­ dá»¥:
+Ví dụ:
 
-- thread 1 vá»«a xong task 5
-- thread 2 vá»«a xong task 6
-- thread 3 vá»«a chuyá»ƒn task 7 sang `RUNNING`
+- thread 1 vừa xong task 5
+- thread 2 vừa xong task 6
+- thread 3 vừa chuyển task 7 sang `RUNNING`
 
-Náº¿u khÃ´ng Ä‘á»“ng bá»™ truy cáº­p state, sá»‘ liá»‡u cÃ³ thá»ƒ bá»‹ lá»‡ch.
+Nếu không đồng bộ truy cập state, số liệu có thể bị lệch.
 
-## 6. Snapshot lÃ  gÃ¬?
+## 6. Snapshot là gì?
 
-Snapshot lÃ  dá»¯ liá»‡u Ä‘Ã£ Ä‘Æ°á»£c tracker tá»•ng há»£p láº¡i Ä‘á»ƒ tráº£ cho client.
+Snapshot là dữ liệu đã được tracker tổng hợp lại để trả cho client.
 
-Hiá»‡n táº¡i cÃ³ 2 loáº¡i snapshot chÃ­nh:
+Hiện tại có 3 nhóm dữ liệu đọc chính:
 
 - `DownloadJobSnapshot`
 - `DownloadTaskSnapshot`
+- `JobFailureSummary`
 
 ### `DownloadJobSnapshot`
 
-ÄÃ¢y lÃ  bá»©c tranh lá»›n cá»§a cáº£ job.
+Đây là bức tranh lớn của cả job.
 
-NÃ³ cho biáº¿t:
+Nó cho biết:
 
-- tá»•ng task
+- tổng task
 - queued
 - running
 - completed
 - okCount
 - failCount
-- tá»•ng byte Ä‘Ã£ táº£i
-- wall time của job (được đóng băng khi job hoàn tất)
-- thá»i gian trung bÃ¬nh má»—i task
-- throughput hiá»‡n táº¡i
-- finished hay chÆ°a
+- cancelledCount
+- tổng byte đã tải
+- wall time của job
+- thời gian trung bình mỗi task
+- throughput hiện tại
+- cancelled hay chưa
+- finished hay chưa
 
 ### `DownloadTaskSnapshot`
 
-ÄÃ¢y lÃ  áº£nh chá»¥p cá»§a tá»«ng task riÃªng láº».
+Đây là ảnh chụp của từng task riêng lẻ.
 
-NÃ³ cho biáº¿t:
+Nó cho biết:
 
-- index cá»§a task
-- URL cá»¥ thá»ƒ
-- tráº¡ng thÃ¡i hiá»‡n táº¡i
-- sá»‘ byte
-- sá»‘ mili giÃ¢y
+- index của task
+- URL cụ thể
+- trạng thái hiện tại
+- số byte
+- số mili giây
+- retry count
 - content type
-- lá»—i náº¿u cÃ³
-- thread xá»­ lÃ½
+- lỗi nếu có
+- failure type
+- thread xử lý
 
-## 7. Luá»“ng hoÃ n chá»‰nh báº±ng lá»i
+### `JobFailureSummary`
 
-HÃ£y Ä‘á»c cáº£ há»‡ thá»‘ng theo cÃ¢u chuyá»‡n sau:
+Đây là bản tổng hợp nhanh về reliability của job.
 
-1. Client gá»i `GET /jobs/start`.
-2. `DownloadController` nháº­n request.
-3. `DownloadJobService` táº¡o job má»›i.
-4. `DownloadJobService` táº¡o nhiá»u task tá»« `count` vÃ  `baseUrl`.
-5. Má»—i task Ä‘Æ°á»£c Ä‘Äƒng kÃ½ vÃ o `DownloadJobTracker` vá»›i tráº¡ng thÃ¡i ban Ä‘áº§u lÃ  `QUEUED`.
-6. `DownloadJobService` gá»i `ImageDownloaderService.downloadImage(...)` cho tá»«ng task.
-7. VÃ¬ cÃ³ `@Async`, má»—i task Ä‘Æ°á»£c Ä‘áº©y sang thread pool `imageTaskExecutor`.
-8. Worker báº¯t Ä‘áº§u cháº¡y, Ä‘Ã¡nh dáº¥u task thÃ nh `RUNNING`.
-9. Worker gá»i HTTP, nháº­n dá»¯ liá»‡u, kiá»ƒm tra áº£nh, ghi file.
-10. Worker táº¡o `DownloadResult`.
-11. `DownloadJobTracker` nháº­n káº¿t quáº£ vÃ  cáº­p nháº­t task thÃ nh `SUCCESS` hoáº·c `FAILED`.
-12. Khi client gá»i `GET /jobs/{jobId}`, tracker tráº£ snapshot tá»•ng quan.
-13. Khi client gá»i `GET /jobs/{jobId}/tasks`, tracker tráº£ danh sÃ¡ch snapshot chi tiáº¿t cá»§a tá»«ng task.
+Nó cho biết:
 
-## 8. PhÃ¢n biá»‡t 4 khÃ¡i niá»‡m ráº¥t dá»… bá»‹ trá»™n
+- có bao nhiêu task fail cuối cùng
+- có bao nhiêu task từng retry
+- có bao nhiêu task thành công sau retry
+- failure type nào đang xuất hiện nhiều nhất
+
+## 7. Luồng hoàn chỉnh bằng lời
+
+Hãy đọc cả hệ thống theo câu chuyện sau:
+
+1. Client gọi `GET /jobs/start`.
+2. `DownloadController` nhận request.
+3. `DownloadJobService` tạo job mới.
+4. `DownloadJobService` tạo nhiều task từ `count` và `baseUrl`.
+5. Mỗi task được đăng ký vào `DownloadJobTracker` với trạng thái ban đầu là `QUEUED`.
+6. `DownloadJobService` gọi `ImageDownloaderService.downloadImage(...)` cho từng task.
+7. Vì có `@Async`, mỗi task được đẩy sang thread pool `imageTaskExecutor`.
+8. Worker bắt đầu chạy, đánh dấu task thành `RUNNING`.
+9. Worker gọi HTTP, nhận dữ liệu, kiểm tra ảnh, ghi file.
+10. Worker tạo `DownloadResult`.
+11. `DownloadJobTracker` nhận kết quả và cập nhật task thành `SUCCESS`, `FAILED` hoặc `CANCELLED`.
+12. Khi client gọi `GET /jobs/{jobId}`, tracker trả snapshot tổng quan.
+13. Khi client gọi `GET /jobs/{jobId}/tasks`, tracker trả danh sách snapshot chi tiết của từng task.
+14. Nếu client gọi `GET /jobs/{jobId}/failure-summary`, tracker trả summary về lỗi và retry.
+15. Nếu client gọi `POST /jobs/{jobId}/cancel`, tracker đánh dấu job bị hủy và chặn phần việc tương lai.
+
+## 8. Phân biệt 4 khái niệm rất dễ bị trộn
 
 ### `job`
 
-Má»™t Ä‘á»£t cÃ´ng viá»‡c lá»›n.
+Một đợt công việc lớn.
 
-VÃ­ dá»¥:
+Ví dụ:
 
-- táº£i 50 áº£nh tá»« má»™t nguá»“n
+- tải 50 ảnh từ một nguồn
 
 ### `task`
 
-Má»™t Ä‘Æ¡n vá»‹ cÃ´ng viá»‡c nhá» bÃªn trong job.
+Một đơn vị công việc nhỏ bên trong job.
 
-VÃ­ dá»¥:
+Ví dụ:
 
-- táº£i áº£nh sá»‘ 17
+- tải ảnh số 17
 
 ### `thread`
 
-Worker Ä‘ang thá»±c thi task.
+Worker đang thực thi task.
 
-VÃ­ dá»¥:
+Ví dụ:
 
 - `IO-Lab-Thread-7`
 
 ### `executor`
 
-NÆ¡i quáº£n lÃ½ nhÃ³m worker thread.
+Nơi quản lý nhóm worker thread.
 
-VÃ­ dá»¥:
+Ví dụ:
 
 - `imageTaskExecutor`
 
-CÃ¡ch nhá»›:
+Cách nhớ:
 
-- `job` = chiáº¿n dá»‹ch lá»›n
-- `task` = viá»‡c con
-- `thread` = ngÆ°á»i lÃ m viá»‡c
-- `executor` = Ä‘á»™i ngÆ°á»i lÃ m viá»‡c
+- `job` = chiến dịch lớn
+- `task` = việc con
+- `thread` = người làm việc
+- `executor` = đội người làm việc
 
-## 9. VÃ¬ sao thiáº¿t káº¿ nÃ y Ä‘Ã¡ng giÃ¡?
+## 9. Vì sao thiết kế này đáng giá?
 
-Náº¿u chá»‰ muá»‘n demo táº£i áº£nh, báº¡n khÃ´ng nháº¥t thiáº¿t pháº£i cÃ³ `job` vÃ  `task`.
+Nếu chỉ muốn demo tải ảnh, bạn không nhất thiết phải có `job` và `task`.
 
-NhÆ°ng náº¿u muá»‘n project lá»›n lÃªn thÃ nh engine tháº­t sá»±, thÃ¬ cÃ¡c khÃ¡i niá»‡m nÃ y lÃ  ná»n táº£ng Ä‘á»ƒ sau nÃ y thÃªm:
+Nhưng nếu muốn project lớn lên thành engine thật sự, thì các khái niệm này là nền tảng để sau này thêm:
 
 - retry
 - timeout policy
@@ -346,14 +414,14 @@ NhÆ°ng náº¿u muá»‘n project lá»›n lÃªn thÃ nh engine tháº­t 
 - benchmark report
 - source adapters
 
-NÃ³i ngáº¯n gá»n:
+Nói ngắn gọn:
 
-- khÃ´ng cÃ³ `job/task` thÃ¬ báº¡n chá»‰ cÃ³ má»™t Ä‘á»‘ng lá»i gá»i async rá»i ráº¡c
-- cÃ³ `job/task` thÃ¬ báº¡n cÃ³ má»™t workflow cÃ³ thá»ƒ quan sÃ¡t, giáº£i thÃ­ch, vÃ  má»Ÿ rá»™ng
+- không có `job/task` thì bạn chỉ có một đống lời gọi async rời rạc
+- có `job/task` thì bạn có một workflow có thể quan sát, giải thích, và mở rộng
 
-## 10. CÃ¡ch Ä‘á»c code cho Ä‘á»¡ rá»‘i
+## 10. Cách đọc code cho đỡ rối
 
-Báº¡n nÃªn Ä‘á»c code theo thá»© tá»± nÃ y:
+Bạn nên đọc code theo thứ tự này:
 
 1. `DownloadController`
 2. `DownloadJobService`
@@ -361,10 +429,10 @@ Báº¡n nÃªn Ä‘á»c code theo thá»© tá»± nÃ y:
 4. `DownloadJobTracker`
 5. `AsyncConfig`
 
-Náº¿u Ä‘á»c theo thá»© tá»± Ä‘Ã³, báº¡n sáº½ tháº¥y rÃµ:
+Nếu đọc theo thứ tự đó, bạn sẽ thấy rõ:
 
-- request vÃ o á»Ÿ Ä‘Ã¢u
-- ai chia viá»‡c
-- ai lÃ m viá»‡c tháº­t
-- ai ghi nháº­n tráº¡ng thÃ¡i
-- ai cáº¥u hÃ¬nh thread pool
+- request vào ở đâu
+- ai chia việc
+- ai làm việc thật
+- ai ghi nhận trạng thái
+- ai cấu hình thread pool
