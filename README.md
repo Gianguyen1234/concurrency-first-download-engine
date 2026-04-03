@@ -13,15 +13,24 @@ This project started as a multi-threaded image downloader and is being evolved i
 
 ## Current State
 
-Phase 1 is in progress.
+Phase 1 is completed.
+
+Phase 2 reliability-control is also completed on the current working branch.
 
 What already exists:
 
 - async download execution with `ThreadPoolTaskExecutor`
 - job-based download flow
-- task-level tracking (`QUEUED`, `RUNNING`, `SUCCESS`, `FAILED`)
+- task-level tracking (`QUEUED`, `RUNNING`, `SUCCESS`, `FAILED`, `CANCELLED`)
 - pool inspection endpoint
-- basic throughput and latency metrics
+- throughput and latency metrics
+- `baseUrl` validation
+- HTTP connect/read timeouts
+- failure classification
+- retry policy for transient failures
+- failure summary per job
+- cancel job endpoint
+- benchmark mode and benchmark findings
 
 ## Vision
 
@@ -43,6 +52,9 @@ Current endpoints:
 - `GET /jobs/start?count=50&baseUrl=https://picsum.photos/300/300`
 - `GET /jobs/{jobId}`
 - `GET /jobs/{jobId}/tasks`
+- `GET /jobs/{jobId}/failure-summary`
+- `POST /jobs/{jobId}/cancel`
+- `GET /benchmarks/run?count=50&baseUrl=https://picsum.photos/300/300&pollIntervalMs=200&timeoutMillis=60000`
 - `GET /pool-status`
 
 ## Project Structure
@@ -55,10 +67,15 @@ src/main/java/com/holydev/lab/multithreadediolab
   app/
     DownloadJobService.java
   domain/
+    benchmark/
+      BenchmarkReport.java
     download/
+      FailureType.java
       DownloadResult.java
     job/
+      CancelJobResponse.java
       DownloadJobSnapshot.java
+      JobFailureSummary.java
       DownloadTaskSnapshot.java
       StartJobResponse.java
       TaskStatus.java
@@ -101,7 +118,15 @@ Example flow:
 2. Read the returned `jobId`
 3. Call `GET /jobs/{jobId}`
 4. Call `GET /jobs/{jobId}/tasks`
-5. Call `GET /pool-status`
+5. Call `GET /jobs/{jobId}/failure-summary`
+6. Optionally call `POST /jobs/{jobId}/cancel`
+7. Call `GET /pool-status`
+
+Example benchmark:
+
+```bash
+curl "http://localhost:8080/benchmarks/run?count=50&baseUrl=https://picsum.photos/300/300&pollIntervalMs=200&timeoutMillis=60000"
+```
 
 ## Why This Project Exists
 
@@ -153,7 +178,7 @@ Commit style:
 Tagging:
 
 - use tags at meaningful project milestones
-- planned example: `v0.1.0-phase-1`
+- current milestone tag: `v0.1.0-phase-1`
 
 The goal is to keep the history understandable as the project evolves from a demo into a long-running open-source engine.
 
