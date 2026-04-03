@@ -125,6 +125,7 @@ See:
 - [docs/failure-summary.vi.md](docs/failure-summary.vi.md)
 - [docs/cancel-job.vi.md](docs/cancel-job.vi.md)
 - [docs/benchmark-mode.vi.md](docs/benchmark-mode.vi.md)
+- [docs/benchmark-findings.vi.md](docs/benchmark-findings.vi.md)
 - [docs/roadmap.md](docs/roadmap.md)
 - [docs/profiling-guide.md](docs/profiling-guide.md)
 - [CHANGELOG.md](CHANGELOG.md)
